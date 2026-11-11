@@ -1,0 +1,16 @@
+{
+  "name": "github-status",
+  "version": "0.1.0",
+  "description": "Generate a ranked GitHub stats card and badges as SVG",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "generate": "node src/index.js",
+    "demo": "node src/index.js --fixture test/fixture.json --out demo",
+    "test": "node --test"
+  }
+}
