@@ -3,7 +3,7 @@
 **English** | [한국어](README.ko.md)
 
 Collects your GitHub activity, ranks it (**S to C**), and renders a stats card and **achievement medals** as SVG.
-It runs on Node.js with no dependencies, and a GitHub Actions workflow refreshes the SVGs daily and commits them to `generated/`.
+It is a GitHub Action with no dependencies: add it to a workflow and it refreshes the SVGs and commits them to `generated/`.
 
 ![GitHub Stats](generated/stats.svg)
 
@@ -72,12 +72,56 @@ This is the same model as [github-readme-stats](https://github.com/anuraghazra/g
 
 ## Usage
 
-### GitHub Actions (automatic)
+### GitHub Action
 
-`.github/workflows/update-stats.yml` refreshes the repository owner's stats once a day and whenever you run it manually (`workflow_dispatch`).
+Add this workflow to any repository, for example your profile repository (`<user>/<user>`).
+It writes the SVGs to `generated/` and commits them whenever your numbers change. Nothing needs to be installed.
 
-- The default token only counts public activity.
-- To include contributions to private repositories, add a personal access token with the `repo` and `read:user` scopes as the `GH_STATS_TOKEN` secret.
+```yaml
+# .github/workflows/stats.yml
+name: Update GitHub stats
+on:
+  schedule:
+    - cron: "17 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jihoo12/github-status@v0.1
+```
+
+Then link the images from your README:
+
+```md
+![GitHub Stats](generated/stats.svg)
+![Achievements](generated/achievements.svg)
+<img src="generated/badges/rank.svg" width="80" alt="rank">
+```
+
+| Input | Description | Default |
+| --- | --- | --- |
+| `token` | Token used to read the stats and push the commit | `${{ github.token }}` |
+| `user` | GitHub login to generate stats for | Repository owner |
+| `output-dir` | Directory the files are written to | `generated` |
+| `theme` | Card theme: `auto`, `light`, `dark` | `auto` |
+| `commit` | Commit and push the output directory when it changed | `true` |
+| `commit-message` | Message of that commit | `Update GitHub stats` |
+
+| Output | Description |
+| --- | --- |
+| `rank` | Rank level, `S` to `C` |
+| `percentile` | Top N% (lower is better) |
+| `committed` | `true` when a commit was pushed |
+
+- The default token only counts public activity. To include contributions to private repositories, create a personal access token with the `repo` and `read:user` scopes, save it as a secret and pass it: `token: ${{ secrets.GH_STATS_TOKEN }}`.
+- Committing needs `permissions: contents: write`. Set `commit: false` to only write the files and handle them yourself.
+- Each run adds the rank and achievement table to the workflow run summary.
 
 ### Running locally
 

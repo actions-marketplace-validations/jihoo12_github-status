@@ -19,24 +19,40 @@ query ($login: String!, $after: String) {
   }
 }`;
 
+const RETRIES = 3;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function graphql(query, variables, token) {
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: {
-      authorization: `bearer ${token}`,
-      "content-type": "application/json",
-      "user-agent": "github-status",
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const body = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(`GitHub API responded ${res.status}: ${body?.message ?? res.statusText}`);
+  for (let attempt = 1; ; attempt++) {
+    let res;
+    let body = null;
+    try {
+      res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          authorization: `bearer ${token}`,
+          "content-type": "application/json",
+          "user-agent": "github-status",
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+      body = await res.json().catch(() => null);
+    } catch (err) {
+      if (attempt >= RETRIES) throw new Error(`GitHub API request failed: ${err.message}`);
+    }
+    if (res?.ok) {
+      if (body?.errors?.length) {
+        throw new Error(`GitHub API error: ${body.errors.map((e) => e.message).join("; ")}`);
+      }
+      if (!body?.data) throw new Error("GitHub API returned an empty response");
+      return body.data;
+    }
+    // Network errors and 5xx (GitHub's GraphQL API times out now and then) are worth retrying.
+    if (res && (res.status < 500 || attempt >= RETRIES)) {
+      throw new Error(`GitHub API responded ${res.status}: ${body?.message ?? res.statusText}`);
+    }
+    await sleep(attempt * 2000);
   }
-  if (body?.errors?.length) {
-    throw new Error(`GitHub API error: ${body.errors.map((e) => e.message).join("; ")}`);
-  }
-  return body.data;
 }
 
 /** contributionsCollection only spans one year, so alias one per year for all-time totals. */
@@ -68,8 +84,7 @@ export async function fetchStats(login, token) {
       stars += repo.stargazerCount;
       forks += repo.forkCount;
     }
-    // Sorted by stars descending: once a page ends at zero stars, the rest add nothing we show.
-    if (!page.pageInfo.hasNextPage || page.nodes.at(-1)?.stargazerCount === 0) break;
+    if (!page.pageInfo.hasNextPage) break;
     data = await graphql(USER_QUERY, { login, after: page.pageInfo.endCursor }, token);
     page = data.user.repositories;
   }

@@ -1,13 +1,9 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 
-import { evaluateAchievements, renderAchievements, renderBadges, TIERS } from "./achievements.js";
-import { renderCard } from "./card.js";
 import { fetchStats } from "./fetch.js";
-import { calculateRank } from "./rank.js";
-import { THEME_NAMES } from "./theme.js";
+import { generate } from "./generate.js";
 
 const USAGE = `Usage: node src/index.js [options]
 
@@ -33,9 +29,6 @@ async function main() {
     console.log(USAGE);
     return;
   }
-  if (!THEME_NAMES.includes(values.theme)) {
-    throw new Error(`Unknown theme "${values.theme}" (expected auto, light or dark)`);
-  }
 
   let stats;
   if (values.fixture) {
@@ -48,30 +41,9 @@ async function main() {
     stats = await fetchStats(login, token);
   }
 
-  const rank = calculateRank(stats);
-  const files = {
-    "stats.svg": renderCard(stats, rank, { theme: values.theme }),
-    "achievements.svg": renderAchievements(stats, { theme: values.theme }),
-  };
-  for (const [name, svg] of Object.entries(renderBadges(stats, rank))) {
-    files[path.join("badges", `${name}.svg`)] = svg;
-  }
-  const achievements = evaluateAchievements(stats).map(({ id, name, value, tier, next }) => ({
-    id,
-    name,
-    value,
-    tier: TIERS[tier].name,
-    next,
-  }));
-  files["stats.json"] = `${JSON.stringify({ ...stats, rank, achievements }, null, 2)}\n`;
-
-  for (const [file, content] of Object.entries(files)) {
-    const target = path.join(values.out, file);
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, content);
-  }
+  const { rank, files } = await generate(stats, { out: values.out, theme: values.theme });
   console.log(
-    `${stats.login}: rank ${rank.level} (top ${rank.percentile.toFixed(1)}%) — wrote ${Object.keys(files).length} files to ${values.out}/`,
+    `${stats.login}: rank ${rank.level} (top ${rank.percentile.toFixed(1)}%) — wrote ${files.length} files to ${values.out}/`,
   );
 }
 

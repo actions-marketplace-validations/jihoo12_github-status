@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 
 import { evaluateAchievements, renderAchievements, renderBadges } from "../src/achievements.js";
+import { booleanInput, input, summary } from "../src/action.js";
 import { renderCard } from "../src/card.js";
+import { generate } from "../src/generate.js";
 import { calculateRank } from "../src/rank.js";
 import { formatCount, formatPercentile } from "../src/util.js";
 
@@ -89,4 +93,42 @@ test("achievements card lists every achievement with unique gradient ids", () =>
   assert.ok(svg.includes(">Merge Maker</text>"));
   const ids = [...svg.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test("generate writes every file", async () => {
+  const out = mkdtempSync(path.join(tmpdir(), "github-status-"));
+  try {
+    const { rank, files } = await generate(stats, { out });
+    assert.equal(files.length, 12);
+    for (const file of files) assert.ok(existsSync(path.join(out, file)), file);
+    const json = JSON.parse(readFileSync(path.join(out, "stats.json"), "utf8"));
+    assert.equal(json.rank.level, rank.level);
+    assert.equal(json.achievements.length, 8);
+    await assert.rejects(generate(stats, { out, theme: "neon" }), /Unknown theme/);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("action: inputs and run summary", () => {
+  const env = { "INPUT_OUTPUT-DIR": " assets ", INPUT_COMMIT: "True" };
+  assert.equal(input("output-dir", env), "assets");
+  assert.equal(input("user", env), "");
+  assert.equal(booleanInput("commit", env), true);
+  assert.equal(booleanInput("missing", env), false);
+  assert.throws(() => booleanInput("output-dir", env), /must be true or false/);
+
+  const rank = calculateRank(stats);
+  const md = summary(stats, rank, [{ name: "Star Collector", value: 1234, tier: "Diamond", next: null }]);
+  assert.ok(md.includes("@octocat"));
+  assert.ok(md.includes(`**Rank ${rank.level}**`));
+  assert.ok(md.includes("| Star Collector | 1.2k | Diamond | — |"));
+});
+
+test("action.yml inputs match what the action reads", () => {
+  const yml = readFileSync(new URL("../action.yml", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../src/action.js", import.meta.url), "utf8");
+  const declared = [...yml.split("\noutputs:")[0].matchAll(/^  ([a-z-]+):$/gm)].map((m) => m[1]).filter((n) => n !== "icon" && n !== "color");
+  const read = [...src.matchAll(/[iI]nput\("([a-z-]+)"\)/g)].map((m) => m[1]);
+  assert.deepEqual(declared.sort(), [...new Set(read)].sort());
 });

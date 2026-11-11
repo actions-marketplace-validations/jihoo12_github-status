@@ -1,0 +1,40 @@
+name: GitHub Stats Medals
+description: Generate a ranked GitHub stats card and animated achievement medals as SVG, and commit them to your repository
+author: jihoo12
+
+branding:
+  icon: award
+  color: purple
+
+inputs:
+  token:
+    description: >
+      Token used to read the stats and push the commit. The default token only sees public activity;
+      pass a personal access token (repo, read:user) to count private contributions too.
+    default: ${{ github.token }}
+  user:
+    description: GitHub login to generate stats for. Defaults to the owner of the repository.
+  output-dir:
+    description: Directory the SVG and JSON files are written to
+    default: generated
+  theme:
+    description: "Card theme: auto (follows the viewer's colour scheme), light or dark"
+    default: auto
+  commit:
+    description: Commit and push the output directory when it changed (needs `contents: write`)
+    default: "true"
+  commit-message:
+    description: Message of that commit
+    default: Update GitHub stats
+
+outputs:
+  rank:
+    description: Rank level, from S to C
+  percentile:
+    description: Top N% (lower is better)
+  committed:
+    description: Whether a commit was pushed
+
+runs:
+  using: node24
+  main: src/action.js

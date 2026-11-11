@@ -9,6 +9,7 @@ on:
     paths:
       - "src/**"
       - "flake.*"
+      - "action.yml"
       - ".github/workflows/update-stats.yml"
 
 permissions:
@@ -28,21 +29,10 @@ jobs:
       - name: Test
         run: nix develop -c npm test
 
+      # Dogfood the action itself; it commits generated/ when the stats changed.
       - name: Generate SVGs
-        run: nix develop -c node src/index.js
-        env:
+        uses: ./
+        with:
           # Optional GH_STATS_TOKEN secret (a personal access token) also counts
           # private contributions; the default token only sees public data.
-          GITHUB_TOKEN: ${{ secrets.GH_STATS_TOKEN || github.token }}
-
-      - name: Commit changes
-        run: |
-          git add generated
-          if git diff --cached --quiet; then
-            echo "Stats unchanged."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Update GitHub stats"
-          git push
+          token: ${{ secrets.GH_STATS_TOKEN || github.token }}

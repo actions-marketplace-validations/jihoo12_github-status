@@ -3,7 +3,7 @@
 [English](README.md) | **한국어**
 
 GitHub 활동 통계를 모아 **랭크(S ~ C)** 를 매기고, 통계 카드와 **업적(achievement) 메달**을 SVG로 만들어 주는 도구입니다.
-의존성 없이 Node.js만으로 동작하며, GitHub Actions가 매일 SVG를 갱신해 `generated/`에 커밋합니다.
+의존성 없는 GitHub Action이라, 워크플로에 추가하기만 하면 SVG를 갱신해 `generated/`에 커밋합니다.
 
 ![GitHub Stats](generated/stats.svg)
 
@@ -72,13 +72,56 @@ GitHub 활동 통계를 모아 **랭크(S ~ C)** 를 매기고, 통계 카드와
 
 ## 사용법
 
-### GitHub Actions (자동)
+### GitHub Action
 
-`.github/workflows/update-stats.yml`이 매일 한 번, 그리고 수동 실행(`workflow_dispatch`) 시 저장소 소유자의 통계를 갱신합니다.
+아무 저장소(예: 프로필 저장소 `<user>/<user>`)에 아래 워크플로를 추가하세요.
+SVG를 `generated/`에 만들고, 수치가 바뀌면 커밋까지 합니다. 따로 설치할 것은 없습니다.
 
-- 기본 토큰으로는 공개 활동만 집계됩니다.
-- 비공개 저장소의 기여까지 포함하려면 `repo`, `read:user` 권한의 Personal Access Token을
-  `GH_STATS_TOKEN` 시크릿으로 등록하세요.
+```yaml
+# .github/workflows/stats.yml
+name: Update GitHub stats
+on:
+  schedule:
+    - cron: "17 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jihoo12/github-status@v0.1
+```
+
+그다음 README에서 이미지를 연결합니다.
+
+```md
+![GitHub Stats](generated/stats.svg)
+![Achievements](generated/achievements.svg)
+<img src="generated/badges/rank.svg" width="80" alt="rank">
+```
+
+| 입력 | 설명 | 기본값 |
+| --- | --- | --- |
+| `token` | 통계를 읽고 커밋을 푸시할 때 쓰는 토큰 | `${{ github.token }}` |
+| `user` | 통계를 만들 GitHub 로그인 | 저장소 소유자 |
+| `output-dir` | 파일을 쓸 디렉터리 | `generated` |
+| `theme` | 카드 테마: `auto`, `light`, `dark` | `auto` |
+| `commit` | 출력 디렉터리가 바뀌면 커밋하고 푸시 | `true` |
+| `commit-message` | 그 커밋의 메시지 | `Update GitHub stats` |
+
+| 출력 | 설명 |
+| --- | --- |
+| `rank` | 랭크 (`S` ~ `C`) |
+| `percentile` | 상위 N% (낮을수록 좋음) |
+| `committed` | 커밋을 푸시했으면 `true` |
+
+- 기본 토큰으로는 공개 활동만 집계됩니다. 비공개 저장소의 기여까지 포함하려면 `repo`, `read:user` 권한의 Personal Access Token을 시크릿으로 등록해 `token: ${{ secrets.GH_STATS_TOKEN }}`처럼 넘기세요.
+- 커밋하려면 `permissions: contents: write`가 필요합니다. 파일만 만들고 직접 처리하려면 `commit: false`로 두세요.
+- 실행할 때마다 랭크와 업적 표가 워크플로 실행 요약에 추가됩니다.
 
 ### 로컬 실행
 
