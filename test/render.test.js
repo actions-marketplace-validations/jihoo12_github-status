@@ -131,4 +131,7 @@ test("action.yml inputs match what the action reads", () => {
   const declared = [...yml.split("\noutputs:")[0].matchAll(/^  ([a-z-]+):$/gm)].map((m) => m[1]).filter((n) => n !== "icon" && n !== "color");
   const read = [...src.matchAll(/[iI]nput\("([a-z-]+)"\)/g)].map((m) => m[1]);
   assert.deepEqual(declared.sort(), [...new Set(read)].sort());
+  // An unquoted value containing ": " is a YAML error that only shows up when the runner loads the file.
+  const broken = yml.split("\n").filter((line) => /^\s*[\w-]+: [^"'>|].*: /.test(line));
+  assert.deepEqual(broken, []);
 });

@@ -21,7 +21,7 @@ inputs:
     description: "Card theme: auto (follows the viewer's colour scheme), light or dark"
     default: auto
   commit:
-    description: Commit and push the output directory when it changed (needs `contents: write`)
+    description: "Commit and push the output directory when it changed (needs `contents: write`)"
     default: "true"
   commit-message:
     description: Message of that commit
